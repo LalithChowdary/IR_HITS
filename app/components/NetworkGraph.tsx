@@ -91,10 +91,60 @@ export default function NetworkGraph({ data }: NetworkGraphProps) {
             ctx.fillStyle = '#fff';
             ctx.fillText(label, node.x, node.y + node.val + 8);
           }}
-          linkDirectionalArrowLength={10}
-          linkDirectionalArrowRelPos={1}
-          linkColor={() => '#9ca3af'}
-          linkWidth={2}
+          linkCanvasObject={(link, ctx, globalScale) => {
+            const MAX_ARROW_LENGTH = 10;
+            const ARROW_WIDTH = 2;
+            const NODE_REL_SIZE = 10; // Base node size, adjust as needed
+
+            const start = link.source;
+            const end = link.target;
+
+            // Ignore links with no defined source or target positions
+            if (!start || !end || typeof start.x === 'undefined' || typeof start.y === 'undefined' || typeof end.x === 'undefined' || typeof end.y === 'undefined') {
+              return;
+            }
+
+            const startX = start.x;
+            const startY = start.y;
+            const endX = end.x;
+            const endY = end.y;
+
+            // Calculate the distance between nodes
+            const dist = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
+
+            // Get target node radius (node.val is the radius)
+            const targetNodeRadius = (end as any).val || NODE_REL_SIZE;
+
+            // Calculate the angle of the link
+            const angle = Math.atan2(endY - startY, endX - startX);
+
+            // Adjust the end point to be at the perimeter of the target node
+            const arrowEndPointX = endX - targetNodeRadius * Math.cos(angle);
+            const arrowEndPointY = endY - targetNodeRadius * Math.sin(angle);
+
+            // Draw link
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(arrowEndPointX, arrowEndPointY);
+            ctx.lineWidth = 2 / globalScale; // Scale line width with zoom
+            ctx.strokeStyle = '#9ca3af'; // Brighter color for visibility
+            ctx.stroke();
+
+            // Draw arrow head
+            ctx.beginPath();
+            ctx.moveTo(arrowEndPointX, arrowEndPointY);
+            ctx.lineTo(
+              arrowEndPointX - MAX_ARROW_LENGTH * Math.cos(angle - Math.PI / 7),
+              arrowEndPointY - MAX_ARROW_LENGTH * Math.sin(angle - Math.PI / 7)
+            );
+            ctx.lineTo(
+              arrowEndPointX - MAX_ARROW_LENGTH * Math.cos(angle + Math.PI / 7),
+              arrowEndPointY - MAX_ARROW_LENGTH * Math.sin(angle + Math.PI / 7)
+            );
+            ctx.fillStyle = '#9ca3af'; // Same color as link
+            ctx.fill();
+          }}
+          linkCanvasObjectMode={() => 'after'} // Draw links after nodes to ensure visibility
           backgroundColor="#09090b"
           width={800}
           height={600}

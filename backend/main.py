@@ -241,27 +241,82 @@ def compare_algorithms(request: AlgorithmRequest):
         overlap_authorities = list(set(top_pagerank_nodes) & set(top_authority_nodes))
         overlap_hubs = list(set(top_pagerank_nodes) & set(top_hub_nodes))
         
-        # Generate insights
+        # Get top scoring nodes for detailed analysis
+        top_pr_node = list(pagerank_result_for_comparison["top_nodes"][0].keys())[0]
+        top_pr_score = list(pagerank_result_for_comparison["top_nodes"][0].values())[0]
+        top_auth_node = list(hits_result_for_comparison["top_authorities"][0].keys())[0]
+        top_auth_score = list(hits_result_for_comparison["top_authorities"][0].values())[0]
+        top_hub_node = list(hits_result_for_comparison["top_hubs"][0].keys())[0]
+        top_hub_score = list(hits_result_for_comparison["top_hubs"][0].values())[0]
+        
+        # Get node degrees for context
+        node_degrees = get_node_degrees(network["nodes"], network["edges"])
+        
+        # Generate enhanced insights
         insights = []
+        
+        # Overlap insights with percentages
+        overlap_auth_pct = (len(overlap_authorities) / len(top_pagerank_nodes)) * 100 if top_pagerank_nodes else 0
+        overlap_hub_pct = (len(overlap_hubs) / len(top_pagerank_nodes)) * 100 if top_pagerank_nodes else 0
         
         if overlap_authorities:
             insights.append(
-                f"{len(overlap_authorities)} node(s) appear in both top PageRank and top Authorities: {', '.join(overlap_authorities)}"
+                f"📊 {len(overlap_authorities)} node(s) appear in both top PageRank and top Authorities ({overlap_auth_pct:.0f}% overlap): {', '.join(overlap_authorities)}"
             )
         else:
-            insights.append("No overlap between top PageRank nodes and top Authorities")
+            insights.append("📊 No overlap between top PageRank nodes and top Authorities - different ranking criteria")
         
         if overlap_hubs:
             insights.append(
-                f"{len(overlap_hubs)} node(s) appear in both top PageRank and top Hubs: {', '.join(overlap_hubs)}"
+                f"📊 {len(overlap_hubs)} node(s) appear in both top PageRank and top Hubs ({overlap_hub_pct:.0f}% overlap): {', '.join(overlap_hubs)}"
             )
         else:
-            insights.append("No overlap between top PageRank nodes and top Hubs")
+            insights.append("📊 No overlap between top PageRank nodes and top Hubs - different ranking criteria")
+        
+        # Top node analysis with degree information
+        top_pr_in = node_degrees.get(top_pr_node, {}).get("in_degree", 0)
+        top_pr_out = node_degrees.get(top_pr_node, {}).get("out_degree", 0)
+        insights.append(
+            f"🏆 Node {top_pr_node} has highest PageRank ({top_pr_score:.4f}) with {top_pr_in} incoming and {top_pr_out} outgoing citations"
+        )
+        
+        top_auth_in = node_degrees.get(top_auth_node, {}).get("in_degree", 0)
+        insights.append(
+            f"⭐ Node {top_auth_node} is the top Authority ({top_auth_score:.4f}) with {top_auth_in} papers citing it"
+        )
+        
+        top_hub_out = node_degrees.get(top_hub_node, {}).get("out_degree", 0)
+        insights.append(
+            f"🔗 Node {top_hub_node} is the top Hub ({top_hub_score:.4f}) citing {top_hub_out} other papers"
+        )
+        
+        # Convergence insights
+        pr_iters = pagerank_result_for_comparison.get("iterations", 0)
+        hits_iters = hits_result_for_comparison.get("iterations", 0)
+        if pr_iters and hits_iters:
+            insights.append(
+                f"⚡ Algorithms converged: PageRank in {pr_iters} iterations, HITS in {hits_iters} iterations"
+            )
         
         # Domain-specific insights
-        insights.append("In citation networks, high PageRank typically indicates influential papers")
-        insights.append("High authority scores indicate papers that are frequently cited")
-        insights.append("High hub scores indicate papers that cite many important papers")
+        insights.append("💡 In citation networks, high PageRank indicates papers that are both cited and cite other influential papers")
+        insights.append("💡 High Authority scores identify foundational/seminal papers that are frequently referenced")
+        insights.append("💡 High Hub scores identify survey/review papers that cite many important works")
+        
+        # Network structure insight
+        avg_in_degree = sum(d.get("in_degree", 0) for d in node_degrees.values()) / len(node_degrees) if node_degrees else 0
+        avg_out_degree = sum(d.get("out_degree", 0) for d in node_degrees.values()) / len(node_degrees) if node_degrees else 0
+        insights.append(
+            f"📈 Network structure: Average {avg_in_degree:.1f} citations received, {avg_out_degree:.1f} citations made per paper"
+        )
+        
+        # Correlation insight
+        if len(overlap_authorities) > len(overlap_hubs):
+            insights.append("🔍 PageRank correlates more strongly with Authority scores - citation quality matters more than quantity")
+        elif len(overlap_hubs) > len(overlap_authorities):
+            insights.append("🔍 PageRank correlates more strongly with Hub scores - citing behavior influences overall importance")
+        else:
+            insights.append("🔍 PageRank shows balanced correlation with both Authority and Hub scores")
         
         return ComparisonResult(
             pagerank=PageRankResult(**pagerank_result_for_comparison),

@@ -192,8 +192,9 @@ export default function Home() {
                 Algorithm Parameters
               </h3>
               <div className="flex items-center gap-4">
+              <div className="flex flex-col gap-2">
                 <label className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
-                  Damping Factor (ε = {(1 - dampingFactor).toFixed(2)}):
+                  Damping Factor (d):
                   <input
                     type="range"
                     min="0.7"
@@ -205,6 +206,11 @@ export default function Home() {
                   />
                   <span className="font-mono text-blue-600">{dampingFactor.toFixed(2)}</span>
                 </label>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400 ml-2">
+                  Teleportation Probability (ε):{' '}
+                  <span className="font-mono text-purple-600">{(1 - dampingFactor).toFixed(2)}</span>
+                </p>
+              </div>
                 <button
                   onClick={loadData}
                   className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-medium hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl flex items-center gap-2"
