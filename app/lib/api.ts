@@ -62,24 +62,17 @@ export interface VisualizationData {
 }
 
 export const api = {
-  async getNetworks() {
-    const response = await fetch(`${API_BASE_URL}/api/networks`);
-    if (!response.ok) throw new Error('Failed to fetch networks');
-    return response.json();
-  },
-
-  async getNetworkInfo(networkType: string): Promise<NetworkInfo> {
-    const response = await fetch(`${API_BASE_URL}/api/network/${networkType}`);
+  async getNetworkInfo(): Promise<NetworkInfo> {
+    const response = await fetch(`${API_BASE_URL}/api/network`);
     if (!response.ok) throw new Error('Failed to fetch network info');
     return response.json();
   },
 
-  async runPageRank(networkType: string, dampingFactor: number = 0.85): Promise<PageRankResult> {
+  async runPageRank(dampingFactor: number = 0.85): Promise<PageRankResult> {
     const response = await fetch(`${API_BASE_URL}/api/algorithms/pagerank`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        network_type: networkType,
         damping_factor: dampingFactor,
         max_iterations: 100,
         convergence_threshold: 0.0001,
@@ -89,12 +82,25 @@ export const api = {
     return response.json();
   },
 
-  async runHITS(networkType: string): Promise<HITSResult> {
+  async runPageRankWithHistory(dampingFactor: number = 0.85): Promise<PageRankResult> {
+    const response = await fetch(`${API_BASE_URL}/api/algorithms/pagerank/iterations`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        damping_factor: dampingFactor,
+        max_iterations: 100,
+        convergence_threshold: 0.0001,
+      }),
+    });
+    if (!response.ok) throw new Error('Failed to run PageRank with history');
+    return response.json();
+  },
+
+  async runHITS(): Promise<HITSResult> {
     const response = await fetch(`${API_BASE_URL}/api/algorithms/hits`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        network_type: networkType,
         max_iterations: 100,
         convergence_threshold: 0.0001,
       }),
@@ -103,12 +109,24 @@ export const api = {
     return response.json();
   },
 
-  async compareAlgorithms(networkType: string, dampingFactor: number = 0.85): Promise<ComparisonResult> {
+  async runHITSWithHistory(): Promise<HITSResult> {
+    const response = await fetch(`${API_BASE_URL}/api/algorithms/hits/iterations`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        max_iterations: 100,
+        convergence_threshold: 0.0001,
+      }),
+    });
+    if (!response.ok) throw new Error('Failed to run HITS with history');
+    return response.json();
+  },
+
+  async compareAlgorithms(dampingFactor: number = 0.85): Promise<ComparisonResult> {
     const response = await fetch(`${API_BASE_URL}/api/algorithms/compare`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        network_type: networkType,
         damping_factor: dampingFactor,
         max_iterations: 100,
         convergence_threshold: 0.0001,
@@ -118,9 +136,9 @@ export const api = {
     return response.json();
   },
 
-  async getVisualization(networkType: string, includeScores: boolean = true): Promise<VisualizationData> {
+  async getVisualization(includeScores: boolean = true): Promise<VisualizationData> {
     const response = await fetch(
-      `${API_BASE_URL}/api/visualization/${networkType}?include_scores=${includeScores}`
+      `${API_BASE_URL}/api/visualization?include_scores=${includeScores}`
     );
     if (!response.ok) throw new Error('Failed to fetch visualization data');
     return response.json();

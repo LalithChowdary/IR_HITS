@@ -14,6 +14,12 @@ export interface PageRankResult {
   iterations: number;
   convergence_threshold: number;
   damping_factor: number;
+  history?: PageRankIterationHistory[];
+}
+
+export interface PageRankIterationHistory {
+  iteration: number;
+  scores: Record<string, number>;
 }
 
 export interface HITSResult {
@@ -22,6 +28,13 @@ export interface HITSResult {
   top_authorities: Array<Record<string, number>>;
   top_hubs: Array<Record<string, number>>;
   iterations: number;
+  history?: IterationHistory[];
+}
+
+export interface IterationHistory {
+  iteration: number;
+  authority_scores: Record<string, number>;
+  hub_scores: Record<string, number>;
 }
 
 export interface ComparisonResult {

@@ -111,8 +111,8 @@ def prepare_visualization_data(
     """
     G = build_graph(nodes, edges)
     
-    # Get positions using spring layout
-    pos = nx.spring_layout(G, k=2, iterations=50)
+    # Get positions using a circular layout for better initial distribution
+    pos = nx.circular_layout(G)
     
     # Prepare node data
     node_data = []

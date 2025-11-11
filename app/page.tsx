@@ -1,16 +1,25 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import { Network, Sparkles, TrendingUp, Search, BarChart3, Loader2 } from 'lucide-react';
 import { api } from './lib/api';
 import { ComparisonResult, VisualizationData, NetworkInfo } from './lib/types';
 import RankingChart from './components/RankingChart';
 import StatCard from './components/StatCard';
 import InsightsPanel from './components/InsightsPanel';
-import NetworkGraph from './components/NetworkGraph';
+
+const NetworkGraph = dynamic(() => import('./components/NetworkGraph'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-[600px] bg-zinc-900 rounded-xl">
+      <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+    </div>
+  ),
+});
 
 export default function Home() {
-  const [networkType, setNetworkType] = useState<'citation' | 'social'>('citation');
   const [loading, setLoading] = useState(false);
   const [comparisonData, setComparisonData] = useState<ComparisonResult | null>(null);
   const [visualizationData, setVisualizationData] = useState<VisualizationData | null>(null);
@@ -19,15 +28,15 @@ export default function Home() {
 
   useEffect(() => {
     loadData();
-  }, [networkType]);
+  }, []);
 
   const loadData = async () => {
     setLoading(true);
     try {
       const [comparison, visualization, info] = await Promise.all([
-        api.compareAlgorithms(networkType, dampingFactor),
-        api.getVisualization(networkType, true),
-        api.getNetworkInfo(networkType),
+        api.compareAlgorithms(dampingFactor),
+        api.getVisualization(true),
+        api.getNetworkInfo(),
       ]);
       setComparisonData(comparison);
       setVisualizationData(visualization);
@@ -54,33 +63,8 @@ export default function Home() {
                   PageRank & HITS Analysis
                 </h1>
                 <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                  Network Ranking & Authority Detection
+                  Citation Network Ranking & Authority Detection
                 </p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              <div className="flex gap-2 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg">
-                <button
-                  onClick={() => setNetworkType('citation')}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                    networkType === 'citation'
-                      ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-400 shadow-sm'
-                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
-                  }`}
-                >
-                  📚 Citation Network
-                </button>
-                <button
-                  onClick={() => setNetworkType('social')}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                    networkType === 'social'
-                      ? 'bg-white dark:bg-zinc-700 text-purple-600 dark:text-purple-400 shadow-sm'
-                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
-                  }`}
-                >
-                  👥 Social Network
-                </button>
               </div>
             </div>
           </div>
@@ -135,20 +119,24 @@ export default function Home() {
             {/* Stats Cards */}
             {comparisonData && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <StatCard
-                  title="PageRank Iterations"
-                  value={comparisonData.pagerank.iterations}
-                  subtitle={`Damping factor: ${(comparisonData.pagerank.damping_factor * 100).toFixed(0)}%`}
-                  icon="trending"
-                  color="text-blue-600"
-                />
-                <StatCard
-                  title="HITS Iterations"
-                  value={comparisonData.hits.iterations}
-                  subtitle="Authority & Hub scores computed"
-                  icon="award"
-                  color="text-green-600"
-                />
+                <Link href="/pagerank-iterations">
+                  <StatCard
+                    title="PageRank Iterations"
+                    value={comparisonData.pagerank.iterations}
+                    subtitle={`Damping factor: ${(comparisonData.pagerank.damping_factor * 100).toFixed(0)}%`}
+                    icon="trending"
+                    color="text-blue-600"
+                  />
+                </Link>
+                <Link href="/hits-iterations">
+                  <StatCard
+                    title="HITS Iterations"
+                    value={comparisonData.hits.iterations}
+                    subtitle="Authority & Hub scores computed"
+                    icon="award"
+                    color="text-green-600"
+                  />
+                </Link>
                 <StatCard
                   title="Overlap Nodes"
                   value={comparisonData.overlap_authorities.length}

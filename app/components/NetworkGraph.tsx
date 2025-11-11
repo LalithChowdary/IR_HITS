@@ -13,8 +13,8 @@ export default function NetworkGraph({ data }: NetworkGraphProps) {
 
   useEffect(() => {
     if (fgRef.current) {
-      fgRef.current.d3Force('charge').strength(-300);
-      fgRef.current.d3Force('link').distance(100);
+      fgRef.current.d3Force('charge').strength(-600);
+      fgRef.current.d3Force('link').distance(150);
     }
   }, []);
 
@@ -91,10 +91,10 @@ export default function NetworkGraph({ data }: NetworkGraphProps) {
             ctx.fillStyle = '#fff';
             ctx.fillText(label, node.x, node.y + node.val + 8);
           }}
-          linkDirectionalArrowLength={6}
+          linkDirectionalArrowLength={10}
           linkDirectionalArrowRelPos={1}
-          linkColor={() => '#4b5563'}
-          linkWidth={1.5}
+          linkColor={() => '#9ca3af'}
+          linkWidth={2}
           backgroundColor="#09090b"
           width={800}
           height={600}
