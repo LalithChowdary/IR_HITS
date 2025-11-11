@@ -10,7 +10,7 @@ import InsightsPanel from './components/InsightsPanel';
 import NetworkGraph from './components/NetworkGraph';
 
 export default function Home() {
-  const [networkType, setNetworkType] = useState<'citation' | 'social'>('citation');
+  const networkType = 'citation'; // Only citation network supported
   const [loading, setLoading] = useState(false);
   const [comparisonData, setComparisonData] = useState<ComparisonResult | null>(null);
   const [visualizationData, setVisualizationData] = useState<VisualizationData | null>(null);
@@ -19,7 +19,7 @@ export default function Home() {
 
   useEffect(() => {
     loadData();
-  }, [networkType]);
+  }, []);
 
   const loadData = async () => {
     setLoading(true);
@@ -60,27 +60,10 @@ export default function Home() {
             </div>
             
             <div className="flex items-center gap-4">
-              <div className="flex gap-2 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg">
-                <button
-                  onClick={() => setNetworkType('citation')}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                    networkType === 'citation'
-                      ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-400 shadow-sm'
-                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
-                  }`}
-                >
-                  📚 Citation Network
-                </button>
-                <button
-                  onClick={() => setNetworkType('social')}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                    networkType === 'social'
-                      ? 'bg-white dark:bg-zinc-700 text-purple-600 dark:text-purple-400 shadow-sm'
-                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
-                  }`}
-                >
-                  👥 Social Network
-                </button>
+              <div className="px-4 py-2 bg-gradient-to-r from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 rounded-lg">
+                <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                  📚 Citation Network Analysis
+                </span>
               </div>
             </div>
           </div>

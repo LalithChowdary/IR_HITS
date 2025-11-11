@@ -32,9 +32,8 @@ def load_network_from_csv(csv_file: str) -> Tuple[List[str], List[Tuple[str, str
     nodes = sorted(list(nodes_set))
     return nodes, edges
 
-# Load networks from CSV files
+# Load citation network from CSV file
 _citation_nodes, _citation_edges = load_network_from_csv('citation_network.csv')
-_social_nodes, _social_edges = load_network_from_csv('social_network.csv')
 
 # Citation Network: Research papers citing each other
 CITATION_NETWORK = {
@@ -46,36 +45,20 @@ CITATION_NETWORK = {
     "csv_file": "citation_network.csv"
 }
 
-# Social Network: Users mentioning/retweeting each other
-SOCIAL_NETWORK = {
-    "name": "Social Media Network",
-    "description": f"Users mentioning and retweeting each other ({len(_social_nodes)} nodes, {len(_social_edges)} edges)",
-    "type": "social",
-    "nodes": _social_nodes,
-    "edges": _social_edges,
-    "csv_file": "social_network.csv"
-}
-
 def get_network(network_type: str = "citation"):
     """
-    Get a sample network by type
+    Get the citation network
     
     Args:
-        network_type: "citation" or "social"
+        network_type: Only "citation" is supported
     
     Returns:
-        Dictionary containing network data
+        Dictionary containing citation network data
     """
-    if network_type.lower() == "citation":
-        return CITATION_NETWORK
-    elif network_type.lower() == "social":
-        return SOCIAL_NETWORK
-    else:
-        return CITATION_NETWORK
+    return CITATION_NETWORK
 
 def get_all_networks():
     """Get all available sample networks"""
     return {
-        "citation": CITATION_NETWORK,
-        "social": SOCIAL_NETWORK
+        "citation": CITATION_NETWORK
     }
