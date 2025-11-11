@@ -3,11 +3,12 @@ FastAPI Backend for PageRank and HITS Analysis
 """
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Dict, List
+from typing import Dict, List, Tuple
+import csv
+import os
 
 from algorithms.pagerank import PageRank
 from algorithms.hits import HITS
-from data.sample_networks import get_network, get_all_networks
 from models.graph_models import (
     AlgorithmRequest, 
     PageRankResult, 
@@ -21,6 +22,40 @@ from utils.graph_builder import (
     prepare_visualization_data,
     get_node_degrees
 )
+
+# Load citation network from CSV
+def load_citation_network() -> Tuple[List[str], List[Tuple[str, str]]]:
+    """Load citation network from CSV file"""
+    edges = []
+    nodes_set = set()
+    
+    csv_path = os.path.join(os.path.dirname(__file__), 'data', 'citation_network.csv')
+    
+    with open(csv_path, 'r') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            source = row['source'].strip()
+            target = row['target'].strip()
+            edges.append((source, target))
+            nodes_set.add(source)
+            nodes_set.add(target)
+    
+    nodes = sorted(list(nodes_set))
+    return nodes, edges
+
+# Load the network at startup
+_nodes, _edges = load_citation_network()
+
+def get_network():
+    """Get the citation network data"""
+    return {
+        "name": "Academic Citation Network",
+        "description": f"Research papers citing each other ({len(_nodes)} nodes, {len(_edges)} edges)",
+        "type": "citation",
+        "nodes": _nodes,
+        "edges": _edges,
+        "csv_file": "citation_network.csv"
+    }
 
 app = FastAPI(
     title="PageRank & HITS Analysis API",
@@ -45,39 +80,33 @@ def read_root():
         "message": "PageRank & HITS Analysis API",
         "version": "1.0.0",
         "endpoints": {
-            "networks": "/api/networks",
-            "network_info": "/api/network/{network_type}",
+            "network_info": "/api/network",
             "pagerank": "/api/algorithms/pagerank",
             "hits": "/api/algorithms/hits",
             "compare": "/api/algorithms/compare",
-            "visualization": "/api/visualization/{network_type}"
+            "visualization": "/api/visualization"
         }
     }
 
 
-@app.get("/api/networks")
-def get_networks():
-    """Get all available sample networks"""
-    networks = get_all_networks()
+@app.get("/api/network-info")
+def get_network_summary():
+    """Get network summary information"""
+    network = get_network()
     
-    network_list = []
-    for net_type, net_data in networks.items():
-        network_list.append({
-            "type": net_type,
-            "name": net_data["name"],
-            "description": net_data["description"],
-            "num_nodes": len(net_data["nodes"]),
-            "num_edges": len(net_data["edges"])
-        })
-    
-    return {"networks": network_list}
+    return {
+        "name": network["name"],
+        "description": network["description"],
+        "num_nodes": len(network["nodes"]),
+        "num_edges": len(network["edges"])
+    }
 
 
-@app.get("/api/network/{network_type}", response_model=NetworkInfo)
-def get_network_info(network_type: str):
-    """Get detailed information about a specific network"""
+@app.get("/api/network", response_model=NetworkInfo)
+def get_network_info():
+    """Get detailed information about the citation network"""
     try:
-        network = get_network(network_type)
+        network = get_network()
         stats = get_network_statistics(network["nodes"], network["edges"])
         
         return NetworkInfo(
@@ -95,10 +124,10 @@ def get_network_info(network_type: str):
 
 @app.post("/api/algorithms/pagerank", response_model=PageRankResult)
 def run_pagerank(request: AlgorithmRequest):
-    """Run PageRank algorithm on selected network"""
+    """Run PageRank algorithm on citation network"""
     try:
         # Get network data
-        network = get_network(request.network_type)
+        network = get_network()
         
         # Initialize and run PageRank
         pr = PageRank(
@@ -109,18 +138,37 @@ def run_pagerank(request: AlgorithmRequest):
         
         result = pr.calculate(network["nodes"], network["edges"])
         
+        # Exclude history for this endpoint
+        result.pop("history", None)
+        
         return PageRankResult(**result)
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"PageRank calculation failed: {str(e)}")
 
 
+@app.post("/api/algorithms/pagerank/iterations", response_model=PageRankResult)
+def run_pagerank_with_iterations(request: AlgorithmRequest):
+    """Run PageRank and return results with iteration history"""
+    try:
+        network = get_network()
+        pr = PageRank(
+            damping_factor=request.damping_factor,
+            max_iterations=request.max_iterations,
+            convergence_threshold=request.convergence_threshold
+        )
+        result = pr.calculate(network["nodes"], network["edges"])
+        return PageRankResult(**result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"PageRank calculation failed: {str(e)}")
+
+
 @app.post("/api/algorithms/hits", response_model=HITSResult)
 def run_hits(request: AlgorithmRequest):
-    """Run HITS algorithm on selected network"""
+    """Run HITS algorithm on citation network"""
     try:
         # Get network data
-        network = get_network(request.network_type)
+        network = get_network()
         
         # Initialize and run HITS
         hits = HITS(
@@ -130,8 +178,26 @@ def run_hits(request: AlgorithmRequest):
         
         result = hits.calculate(network["nodes"], network["edges"])
         
+        # Exclude history for this endpoint
+        result.pop("history", None)
+        
         return HITSResult(**result)
     
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"HITS calculation failed: {str(e)}")
+
+
+@app.post("/api/algorithms/hits/iterations", response_model=HITSResult)
+def run_hits_with_iterations(request: AlgorithmRequest):
+    """Run HITS and return results with iteration history"""
+    try:
+        network = get_network()
+        hits = HITS(
+            max_iterations=request.max_iterations,
+            convergence_threshold=request.convergence_threshold
+        )
+        result = hits.calculate(network["nodes"], network["edges"])
+        return HITSResult(**result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"HITS calculation failed: {str(e)}")
 
@@ -141,7 +207,7 @@ def compare_algorithms(request: AlgorithmRequest):
     """Run both PageRank and HITS, then compare results"""
     try:
         # Get network data
-        network = get_network(request.network_type)
+        network = get_network()
         
         # Run PageRank
         pr = PageRank(
@@ -151,6 +217,10 @@ def compare_algorithms(request: AlgorithmRequest):
         )
         pagerank_result = pr.calculate(network["nodes"], network["edges"])
         
+        # Exclude history for comparison
+        pagerank_result_for_comparison = pagerank_result.copy()
+        pagerank_result_for_comparison.pop("history", None)
+        
         # Run HITS
         hits = HITS(
             max_iterations=request.max_iterations,
@@ -158,10 +228,14 @@ def compare_algorithms(request: AlgorithmRequest):
         )
         hits_result = hits.calculate(network["nodes"], network["edges"])
         
+        # Exclude history for comparison
+        hits_result_for_comparison = hits_result.copy()
+        hits_result_for_comparison.pop("history", None)
+        
         # Extract top node names
-        top_pagerank_nodes = [list(item.keys())[0] for item in pagerank_result["top_nodes"]]
-        top_authority_nodes = [list(item.keys())[0] for item in hits_result["top_authorities"]]
-        top_hub_nodes = [list(item.keys())[0] for item in hits_result["top_hubs"]]
+        top_pagerank_nodes = [list(item.keys())[0] for item in pagerank_result_for_comparison["top_nodes"]]
+        top_authority_nodes = [list(item.keys())[0] for item in hits_result_for_comparison["top_authorities"]]
+        top_hub_nodes = [list(item.keys())[0] for item in hits_result_for_comparison["top_hubs"]]
         
         # Find overlaps
         overlap_authorities = list(set(top_pagerank_nodes) & set(top_authority_nodes))
@@ -185,18 +259,13 @@ def compare_algorithms(request: AlgorithmRequest):
             insights.append("No overlap between top PageRank nodes and top Hubs")
         
         # Domain-specific insights
-        if network["type"] == "citation":
-            insights.append("In citation networks, high PageRank typically indicates influential papers")
-            insights.append("High authority scores indicate papers that are frequently cited")
-            insights.append("High hub scores indicate papers that cite many important papers")
-        elif network["type"] == "social":
-            insights.append("In social networks, high PageRank indicates influential users")
-            insights.append("High authority scores indicate users who are mentioned/retweeted often")
-            insights.append("High hub scores indicate users who frequently mention/retweet others")
+        insights.append("In citation networks, high PageRank typically indicates influential papers")
+        insights.append("High authority scores indicate papers that are frequently cited")
+        insights.append("High hub scores indicate papers that cite many important papers")
         
         return ComparisonResult(
-            pagerank=PageRankResult(**pagerank_result),
-            hits=HITSResult(**hits_result),
+            pagerank=PageRankResult(**pagerank_result_for_comparison),
+            hits=HITSResult(**hits_result_for_comparison),
             overlap_authorities=overlap_authorities,
             overlap_hubs=overlap_hubs,
             insights=insights
@@ -206,12 +275,12 @@ def compare_algorithms(request: AlgorithmRequest):
         raise HTTPException(status_code=500, detail=f"Comparison failed: {str(e)}")
 
 
-@app.get("/api/visualization/{network_type}")
-def get_visualization(network_type: str, include_scores: bool = False):
+@app.get("/api/visualization")
+def get_visualization(include_scores: bool = False):
     """Get graph visualization data"""
     try:
         # Get network data
-        network = get_network(network_type)
+        network = get_network()
         
         viz_data = {
             "nodes": [],
@@ -267,22 +336,22 @@ def get_visualization(network_type: str, include_scores: bool = False):
         raise HTTPException(status_code=500, detail=f"Visualization generation failed: {str(e)}")
 
 
-@app.get("/api/node-degrees/{network_type}")
-def get_degrees(network_type: str):
+@app.get("/api/node-degrees")
+def get_degrees():
     """Get in-degree and out-degree for all nodes"""
     try:
-        network = get_network(network_type)
+        network = get_network()
         degrees = get_node_degrees(network["nodes"], network["edges"])
         return {"node_degrees": degrees}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Degree calculation failed: {str(e)}")
 
 
-@app.get("/api/dataset/{network_type}")
-def get_dataset_info(network_type: str):
+@app.get("/api/dataset")
+def get_dataset_info():
     """Get dataset information including CSV file location"""
     try:
-        network = get_network(network_type)
+        network = get_network()
         return {
             "name": network["name"],
             "description": network["description"],

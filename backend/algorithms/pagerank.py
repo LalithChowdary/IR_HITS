@@ -1,5 +1,5 @@
 """
-PageRank Algorithm Implementation
+PageRank Algorithm Implementation using Matrix Multiplication
 """
 import numpy as np
 from typing import Dict, List, Tuple
@@ -7,16 +7,17 @@ from typing import Dict, List, Tuple
 
 class PageRank:
     """
-    PageRank algorithm implementation
+    PageRank algorithm using explicit matrix multiplication
     
-    The PageRank formula:
-    PR(A) = (1-d) + d * Σ(PR(Ti)/C(Ti))
+    The PageRank formula with teleportation:
+    R_{k+1} = (1 - ε) * M' * R_k + (ε / N) * U
     
     Where:
-    - PR(A) is the PageRank of page A
-    - d is the damping factor (typically 0.85, so ε = 0.15)
-    - Ti are pages that link to page A
-    - C(Ti) is the number of outbound links from page Ti
+    - R_k is the PageRank vector at iteration k
+    - M' is the column-normalized adjacency matrix (transition matrix)
+    - ε (epsilon) is the teleportation probability (reset probability)
+    - N is the number of nodes
+    - U is a vector of ones (uniform teleportation)
     """
     
     def __init__(self, damping_factor: float = 0.85, max_iterations: int = 100, 
@@ -25,17 +26,51 @@ class PageRank:
         Initialize PageRank algorithm
         
         Args:
-            damping_factor: Probability of following links (1 - ε)
+            damping_factor: Probability of following links (typically 0.85)
             max_iterations: Maximum number of iterations
             convergence_threshold: Convergence threshold for stopping
         """
         self.damping_factor = damping_factor
+        self.epsilon = 1 - damping_factor  # Teleportation probability
         self.max_iterations = max_iterations
         self.convergence_threshold = convergence_threshold
         
+    def build_transition_matrix(self, n: int, edges: List[Tuple[int, int]]) -> np.ndarray:
+        """
+        Build column-normalized transition matrix M'
+        
+        Args:
+            n: Number of nodes
+            edges: List of directed edges as (source_idx, target_idx)
+            
+        Returns:
+            Column-normalized adjacency matrix M'
+        """
+        # Initialize adjacency matrix
+        M = np.zeros((n, n))
+        
+        # Build adjacency matrix
+        # M[i, j] = 1 if there's an edge from j to i (column j points to row i)
+        for source_idx, target_idx in edges:
+            M[target_idx, source_idx] = 1
+        
+        # Column-normalize: divide each column by its sum
+        # This makes each column a probability distribution
+        col_sums = M.sum(axis=0)
+        
+        # Handle dangling nodes (nodes with no outlinks)
+        for j in range(n):
+            if col_sums[j] == 0:
+                # Distribute probability uniformly to all nodes
+                M[:, j] = 1.0 / n
+            else:
+                M[:, j] = M[:, j] / col_sums[j]
+        
+        return M
+        
     def calculate(self, nodes: List[str], edges: List[Tuple[str, str]]) -> Dict:
         """
-        Calculate PageRank for a graph
+        Calculate PageRank using matrix multiplication
         
         Args:
             nodes: List of node names
@@ -49,57 +84,51 @@ class PageRank:
         # Create node to index mapping
         node_to_idx = {node: idx for idx, node in enumerate(nodes)}
         
-        # Initialize PageRank values (equal distribution)
-        pagerank = np.ones(n) / n
-        
-        # Build adjacency information
-        # outlinks[i] = list of nodes that node i links to
-        # inlinks[i] = list of nodes that link to node i
-        outlinks = {i: [] for i in range(n)}
-        inlinks = {i: [] for i in range(n)}
-        
+        # Convert edges to indices
+        edge_indices = []
         for source, target in edges:
             if source in node_to_idx and target in node_to_idx:
                 source_idx = node_to_idx[source]
                 target_idx = node_to_idx[target]
-                outlinks[source_idx].append(target_idx)
-                inlinks[target_idx].append(source_idx)
+                edge_indices.append((source_idx, target_idx))
         
-        # Count outlinks for each node
-        outlink_counts = {i: len(outlinks[i]) for i in range(n)}
+        # Build transition matrix M'
+        M_prime = self.build_transition_matrix(n, edge_indices)
         
-        # Iterative computation
+        # Initialize PageRank vector (uniform distribution)
+        R = np.ones(n) / n
+        
+        # Uniform teleportation vector
+        U = np.ones(n)
+        
+        # Store history of scores
+        history = []
+        
+        # Iterative computation using matrix multiplication
         iterations = 0
         for iteration in range(self.max_iterations):
-            new_pagerank = np.zeros(n)
+            # R_{k+1} = (1 - ε) * M' * R_k + (ε / N) * U
+            R_new = self.damping_factor * (M_prime @ R) + (self.epsilon / n) * U
             
-            for i in range(n):
-                # Base rank (random jump)
-                rank_sum = (1 - self.damping_factor) / n
-                
-                # Add rank from incoming links
-                for j in inlinks[i]:
-                    if outlink_counts[j] > 0:
-                        rank_sum += self.damping_factor * (pagerank[j] / outlink_counts[j])
-                    else:
-                        # If node has no outlinks, distribute its rank equally
-                        rank_sum += self.damping_factor * (pagerank[j] / n)
-                
-                new_pagerank[i] = rank_sum
+            # Store current iteration scores
+            history.append({
+                "iteration": iteration + 1,
+                "scores": {nodes[i]: float(R_new[i]) for i in range(n)}
+            })
             
             # Check for convergence
-            diff = np.sum(np.abs(new_pagerank - pagerank))
-            pagerank = new_pagerank
+            diff = np.sum(np.abs(R_new - R))
+            R = R_new
             iterations = iteration + 1
             
             if diff < self.convergence_threshold:
                 break
         
-        # Normalize to sum to 1
-        pagerank = pagerank / np.sum(pagerank)
+        # Normalize to sum to 1 (should already be close)
+        R = R / np.sum(R)
         
         # Create result dictionary
-        node_scores = {nodes[i]: float(pagerank[i]) for i in range(n)}
+        node_scores = {nodes[i]: float(R[i]) for i in range(n)}
         
         # Get top 5 nodes
         sorted_nodes = sorted(node_scores.items(), key=lambda x: x[1], reverse=True)
@@ -110,7 +139,8 @@ class PageRank:
             "top_nodes": top_nodes,
             "iterations": iterations,
             "convergence_threshold": self.convergence_threshold,
-            "damping_factor": self.damping_factor
+            "damping_factor": self.damping_factor,
+            "history": history
         }
     
     def get_top_k(self, node_scores: Dict[str, float], k: int = 5) -> List[Tuple[str, float]]:

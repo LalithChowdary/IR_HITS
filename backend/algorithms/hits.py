@@ -17,7 +17,7 @@ class HITS:
     - Authority(p) = Σ Hub(q) for all q linking to p
     - Hub(p) = Σ Authority(q) for all q that p links to
     
-    Scores are normalized after each iteration
+    Scores are normalized after each iteration using L1 normalization (sum)
     """
     
     def __init__(self, max_iterations: int = 100, convergence_threshold: float = 0.0001):
@@ -40,7 +40,7 @@ class HITS:
             edges: List of directed edges (source, target)
             
         Returns:
-            Dictionary containing authority scores, hub scores, top authorities, and top hubs
+            Dictionary containing authority scores, hub scores, top authorities, top hubs, and iteration history
         """
         n = len(nodes)
         
@@ -52,8 +52,6 @@ class HITS:
         hub = np.ones(n)
         
         # Build adjacency lists
-        # outlinks[i] = list of nodes that node i links to
-        # inlinks[i] = list of nodes that link to node i
         outlinks = {i: [] for i in range(n)}
         inlinks = {i: [] for i in range(n)}
         
@@ -64,6 +62,9 @@ class HITS:
                 outlinks[source_idx].append(target_idx)
                 inlinks[target_idx].append(source_idx)
         
+        # Store history of scores
+        history = []
+        
         # Iterative computation
         iterations = 0
         for iteration in range(self.max_iterations):
@@ -71,25 +72,30 @@ class HITS:
             new_hub = np.zeros(n)
             
             # Update authority scores
-            # Authority(p) = Σ Hub(q) for all q linking to p
             for i in range(n):
                 for j in inlinks[i]:
                     new_authority[i] += hub[j]
             
             # Update hub scores
-            # Hub(p) = Σ Authority(q) for all q that p links to
             for i in range(n):
                 for j in outlinks[i]:
                     new_hub[i] += authority[j]
             
-            # Normalize scores (L2 normalization)
-            auth_norm = np.linalg.norm(new_authority)
-            hub_norm = np.linalg.norm(new_hub)
+            # Normalize scores (L1 normalization - sum of values)
+            auth_norm = np.sum(new_authority)
+            hub_norm = np.sum(new_hub)
             
             if auth_norm > 0:
                 new_authority = new_authority / auth_norm
             if hub_norm > 0:
                 new_hub = new_hub / hub_norm
+            
+            # Store current iteration scores
+            history.append({
+                "iteration": iteration + 1,
+                "authority_scores": {nodes[i]: float(new_authority[i]) for i in range(n)},
+                "hub_scores": {nodes[i]: float(new_hub[i]) for i in range(n)}
+            })
             
             # Check for convergence
             auth_diff = np.sum(np.abs(new_authority - authority))
@@ -119,7 +125,8 @@ class HITS:
             "hub_scores": hub_scores,
             "top_authorities": top_authorities,
             "top_hubs": top_hubs,
-            "iterations": iterations
+            "iterations": iterations,
+            "history": history
         }
     
     def get_top_k_authorities(self, authority_scores: Dict[str, float], k: int = 5) -> List[Tuple[str, float]]:
